@@ -7,10 +7,21 @@ export const createUser = async (req, res) => {
 
   const { uid, name, email } = req.body;
 
+    // verify firebase user
+  if (req.firebaseUser.uid !== uid) {
+    return res.status(403).send("UID mismatch");
+  }
+
   const existingUser = await users.findOne({ uid });
 
-  if (existingUser) {
-    return res.send(existingUser);
+    if (existingUser) {
+
+    const token = generateToken(existingUser);
+
+    return res.send({
+      user: existingUser,
+      token
+    });
   }
 
   const newUser = {
@@ -31,5 +42,24 @@ export const createUser = async (req, res) => {
     user: newUser,
     token
   });
+
+};
+
+
+export const loginUser = async (req, res) => {
+
+  const users = await getUserCollection();
+
+  const uid = req.firebaseUser.uid;
+
+  const user = await users.findOne({ uid });
+
+  if (!user) {
+    return res.status(404).send("User not found");
+  }
+
+  const token = generateToken(user);
+
+  res.send({ user, token });
 
 };
