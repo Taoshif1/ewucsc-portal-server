@@ -56,7 +56,7 @@ export const ensureBootstrapAdminSeeds = async () => {
       studentId,
       role: "admin",
       approvalStatus: "approved",
-      emailVerificationRequired: true,
+      emailVerificationRequired: false,
       isActive: true,
       updatedAt: now,
       approvedAt: existing?.approvedAt || now,
@@ -119,7 +119,7 @@ export const provisionFirebaseUser = async (firebaseUser) => {
         role: "admin",
         approvalStatus: "approved",
         isActive: true,
-        emailVerificationRequired: true,
+        emailVerificationRequired: false,
         approvedAt: user.approvedAt || now,
         approvedBy: user.approvedBy || "bootstrap-config",
       });
@@ -138,7 +138,7 @@ export const provisionFirebaseUser = async (firebaseUser) => {
     email,
     role: bootstrapAdmin ? "admin" : "member",
     approvalStatus: bootstrapAdmin ? "approved" : "pending",
-    emailVerificationRequired: true,
+    emailVerificationRequired: bootstrapAdmin ? false : true,
     ctfScore: 0,
     solvedChallenges: 0,
     homeworkCompleted: 0,
@@ -177,3 +177,8 @@ export const bootstrapAdminsReady = async () => {
 
   return count === emails.length;
 };
+
+
+export const requiresVerifiedFirebaseEmail = (user = {}) =>
+  Boolean(user.emailVerificationRequired) &&
+  !isBootstrapAdminEmail(user.email);
