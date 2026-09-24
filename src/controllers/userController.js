@@ -1,11 +1,10 @@
 import { getUserCollection } from "../models/userModel.js";
 import { generateToken } from "../utils/generateToken.js";
+import { isValidStudentId, normalizeStudentId, studentIdToEmail } from "../utils/ewuIdentity.js";
 
-const STUDENT_ID_PATTERN = /^\d{4}-\d-\d{2}-\d{2,3}$/;
 const ALLOWED_ROLES = ["admin", "executive", "sub-executive", "member"];
 const ALLOWED_APPROVAL_STATES = ["pending", "approved", "rejected", "suspended"];
 
-const normalizeStudentId = (value = "") => value.trim().toLowerCase();
 const studentEmail = (studentId) => `${studentId}@std.ewubd.edu`;
 
 const serializeUser = (user) => {
@@ -31,13 +30,13 @@ export const createUser = async (req, res) => {
       return res.status(400).send({ message: "A valid full name is required" });
     }
 
-    if (!STUDENT_ID_PATTERN.test(studentId)) {
+    if (!isValidStudentId(studentId)) {
       return res.status(400).send({
         message: "Use a valid EWU Student ID, for example 2020-1-10-40",
       });
     }
 
-    const expectedEmail = studentEmail(studentId);
+    const expectedEmail = studentIdToEmail(studentId);
     const firebaseEmail = req.firebaseUser.email?.trim().toLowerCase();
 
     if (firebaseEmail !== expectedEmail) {
