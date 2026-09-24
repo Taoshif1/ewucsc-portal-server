@@ -160,3 +160,20 @@ export const expectedBootstrapAdminEmailForStudentId = (studentId = "") => {
   const email = studentIdToEmail(normalized);
   return isBootstrapAdminEmail(email) ? email : null;
 };
+
+
+export const bootstrapAdminsReady = async () => {
+  const users = await getUserCollection();
+  const emails = [...getBootstrapAdminEmails()];
+
+  if (emails.length === 0) return true;
+
+  const count = await users.countDocuments({
+    email: { $in: emails },
+    role: "admin",
+    approvalStatus: "approved",
+    isActive: { $ne: false },
+  });
+
+  return count === emails.length;
+};
