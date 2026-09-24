@@ -157,3 +157,27 @@ export const updateContent = async (req, res) => {
     return res.status(500).send({ message: "Failed to update content" });
   }
 };
+
+
+export const getPublishedContentBySlug = async (req, res) => {
+  try {
+    const type = validateType(req, res);
+    if (!type) return;
+
+    const collection = await getContentCollection(type);
+    const item = await collection.findOne({
+      slug: req.params.slug,
+      published: true,
+      archived: { $ne: true },
+    });
+
+    if (!item) {
+      return res.status(404).send({ message: "Content not found" });
+    }
+
+    return res.send({ item: serialize(item) });
+  } catch (error) {
+    console.error("Public content detail error:", error);
+    return res.status(500).send({ message: "Failed to load content" });
+  }
+};
