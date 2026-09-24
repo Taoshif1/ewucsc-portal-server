@@ -28,9 +28,6 @@ export const studentIdFromEwuEmail = (email = "") => {
   return isValidStudentId(studentId) ? studentId : null;
 };
 
-export const isBootstrapAdminEmail = (email = "") =>
-  getBootstrapAdminEmails().has(normalizeEmail(email));
-
 export const ensureBootstrapAdminSeeds = async () => {
   const users = await getUserCollection();
   const now = new Date();
