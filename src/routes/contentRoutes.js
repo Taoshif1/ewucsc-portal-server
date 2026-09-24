@@ -3,6 +3,7 @@ import {
   createContent,
   listAllContent,
   listPublishedContent,
+  getPublishedContentBySlug,
   updateContent,
 } from "../controllers/contentController.js";
 import { allowRoles } from "../middleware/allowRoles.js";
@@ -12,6 +13,7 @@ import { verifyJWT } from "../middleware/verifyJWT.js";
 const router = express.Router();
 
 router.get("/:type", listPublishedContent);
+router.get("/:type/:slug", getPublishedContentBySlug);
 
 router.get(
   "/:type/admin/all",
