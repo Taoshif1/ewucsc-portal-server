@@ -1,10 +1,7 @@
-import crypto from "node:crypto";
 import { ObjectId } from "mongodb";
 import { getChallengeCollection, getSolveCollection } from "../models/challengeModel.js";
 import { getUserCollection } from "../models/userModel.js";
-
-const hashFlag = (value = "") =>
-  crypto.createHash("sha256").update(value.trim()).digest("hex");
+import { hashFlag } from "../utils/flag.js";
 
 const serializeChallenge = (challenge, includeDraftFields = false) => {
   if (!challenge) return null;
