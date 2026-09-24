@@ -3,23 +3,18 @@ import admin from "../config/firebase.js";
 export const verifyFirebase = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  console.log("Authorization header:", req.headers.authorization);
-
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).send("Unauthorized");
+    return res.status(401).send({ message: "Unauthorized" });
   }
 
   const token = authHeader.split(" ")[1];
 
   try {
     const decoded = await admin.auth().verifyIdToken(token);
-
     req.firebaseUser = decoded;
-
-    next();
+    return next();
   } catch (error) {
-    console.error("Firebase verify error:", error);
-
-    res.status(401).send("Invalid Firebase Token");
+    console.error("Firebase token verification failed:", error?.code || error?.message);
+    return res.status(401).send({ message: "Invalid Firebase token" });
   }
 };

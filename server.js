@@ -3,25 +3,110 @@ import cors from "cors";
 import dotenv from "dotenv";
 import helmet from "helmet";
 
+import { connectDB } from "./src/config/db.js";
 import userRoutes from "./src/routes/userRoutes.js";
-
+import ctfRoutes from "./src/routes/ctfRoutes.js";
+import challengeRoutes from "./src/routes/challengeRoutes.js";
+import homeworkRoutes from "./src/routes/homeworkRoutes.js";
+import contentRoutes from "./src/routes/contentRoutes.js";
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+const configuredOrigins = [
+  process.env.CLIENT_URL,
+  process.env.LIVE_CLIENT_URL,
+  process.env.ALLOWED_ORIGINS,
+]
+  .filter(Boolean)
+  .flatMap((value) => value.split(","))
+  .map((value) => value.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+const isLocalOrigin = (origin) =>
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+
+      const normalized = origin.replace(/\/$/, "");
+
+      if (
+        configuredOrigins.includes(normalized) ||
+        (process.env.NODE_ENV !== "production" && isLocalOrigin(normalized))
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
 app.use(helmet());
+app.use(express.json({ limit: "1mb" }));
+
+app.get("/api/health", async (req, res) => {
+  try {
+    await connectDB();
+    return res.send({
+      ok: true,
+      service: "ewucsc-portal-server",
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    return res.status(503).send({ ok: false, service: "ewucsc-portal-server" });
+  }
+});
 
 app.use("/api", userRoutes);
+app.use("/api/ctf", ctfRoutes);
+app.use("/api/challenges", challengeRoutes);
+app.use("/api/homeworks", homeworkRoutes);
+app.use("/api/content", contentRoutes);
 
 app.get("/", (req, res) => {
   res.send("EWUCSC Server Running");
 });
 
-const PORT = process.env.PORT || 5000;
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
 
-app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
+  if (error?.message === "Origin not allowed by CORS") {
+    return res.status(403).send({ message: "Origin not allowed" });
+  }
+
+  console.error("Unhandled server error:", error);
+  return res.status(500).send({ message: "Internal server error" });
+});
+
+const PORT = Number(process.env.PORT || 5000);
+let server;
+
+const start = async () => {
+  await connectDB();
+
+  server = app.listen(PORT, () => {
+    console.log(`EWUCSC server listening on port ${PORT}`);
+  });
+};
+
+const shutdown = (signal) => {
+  console.log(`${signal} received. Shutting down EWUCSC server.`);
+  server?.close(() => process.exit(0));
+
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+start().catch((error) => {
+  console.error("EWUCSC server failed to start:", error);
+  process.exit(1);
 });
