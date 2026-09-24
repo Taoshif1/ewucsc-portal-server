@@ -5,7 +5,14 @@ export const verifyAdmin = async (req, res, next) => {
     const users = await getUserCollection();
     const user = await users.findOne({ uid: req.user.uid });
 
-    if (!user || user.role !== "admin" || user.isActive === false) {
+    const approvalStatus = user?.approvalStatus || "approved";
+
+    if (
+      !user ||
+      user.role !== "admin" ||
+      user.isActive === false ||
+      approvalStatus !== "approved"
+    ) {
       return res.status(403).send({ message: "Admin access required" });
     }
 
