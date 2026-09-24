@@ -7,6 +7,7 @@ import userRoutes from "./src/routes/userRoutes.js";
 import ctfRoutes from "./src/routes/ctfRoutes.js";
 import challengeRoutes from "./src/routes/challengeRoutes.js";
 import homeworkRoutes from "./src/routes/homeworkRoutes.js";
+import contentRoutes from "./src/routes/contentRoutes.js";
 
 
 dotenv.config();
@@ -21,6 +22,7 @@ app.use("/api", userRoutes);
 app.use("/api/ctf", ctfRoutes);
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/homeworks", homeworkRoutes);
+app.use("/api/content", contentRoutes);
 
 app.get("/", (req, res) => {
   res.send("EWUCSC Server Running");
