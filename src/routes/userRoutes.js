@@ -10,6 +10,7 @@ import {
   updateRole,
 } from "../controllers/userController.js";
 import { verifyAdmin } from "../middleware/verifyAdmin.js";
+import { verifyApprovedMember } from "../middleware/verifyApprovedMember.js";
 import { verifyFirebase } from "../middleware/verifyFirebase.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 
@@ -18,9 +19,9 @@ const router = express.Router();
 router.post("/users", verifyFirebase, createUser);
 router.post("/login", verifyFirebase, loginUser);
 
-router.get("/profile", verifyJWT, getProfile);
-router.get("/dashboard/overview", verifyJWT, getDashboardOverview);
-router.get("/leaderboard", verifyJWT, getLeaderboard);
+router.get("/profile", verifyJWT, verifyApprovedMember, getProfile);
+router.get("/dashboard/overview", verifyJWT, verifyApprovedMember, getDashboardOverview);
+router.get("/leaderboard", verifyJWT, verifyApprovedMember, getLeaderboard);
 
 router.get("/admin/users", verifyJWT, verifyAdmin, listUsers);
 router.patch("/admin/users/:uid/approval", verifyJWT, verifyAdmin, updateApproval);
