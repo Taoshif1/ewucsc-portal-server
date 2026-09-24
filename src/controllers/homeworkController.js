@@ -3,6 +3,7 @@ import {
   getHomeworkCollection,
   getHomeworkSubmissionCollection,
 } from "../models/homeworkModel.js";
+import { getUserCollection } from "../models/userModel.js";
 
 const serialize = (doc) => ({ ...doc, id: doc._id.toString(), _id: undefined });
 
@@ -167,30 +168,53 @@ export const listHomeworkSubmissions = async (req, res) => {
   try {
     const submissions = await getHomeworkSubmissionCollection();
     const homeworks = await getHomeworkCollection();
+    const users = await getUserCollection();
     const rows = await submissions.find({}).sort({ submittedAt: -1 }).limit(500).toArray();
 
     const homeworkIds = [...new Set(rows.map((row) => row.homeworkId.toString()))].map(
       (id) => new ObjectId(id),
     );
-    const homeworkRows = await homeworks
-      .find({ _id: { $in: homeworkIds } })
-      .project({ title: 1 })
-      .toArray();
+    const uids = [...new Set(rows.map((row) => row.uid).filter(Boolean))];
+
+    const [homeworkRows, memberRows] = await Promise.all([
+      homeworks
+        .find({ _id: { $in: homeworkIds } })
+        .project({ title: 1 })
+        .toArray(),
+      users
+        .find({ uid: { $in: uids } })
+        .project({ uid: 1, name: 1, studentId: 1, email: 1, role: 1 })
+        .toArray(),
+    ]);
+
     const homeworkMap = new Map(homeworkRows.map((row) => [row._id.toString(), row.title]));
+    const memberMap = new Map(memberRows.map((row) => [row.uid, row]));
 
     return res.send({
-      submissions: rows.map((row) => ({
-        id: row._id.toString(),
-        homeworkId: row.homeworkId.toString(),
-        homeworkTitle: homeworkMap.get(row.homeworkId.toString()) || "Homework",
-        uid: row.uid,
-        response: row.response || "",
-        link: row.link || "",
-        status: row.status || "submitted",
-        submittedAt: row.submittedAt,
-        reviewedAt: row.reviewedAt || null,
-        reviewedBy: row.reviewedBy || null,
-      })),
+      submissions: rows.map((row) => {
+        const member = memberMap.get(row.uid);
+
+        return {
+          id: row._id.toString(),
+          homeworkId: row.homeworkId.toString(),
+          homeworkTitle: homeworkMap.get(row.homeworkId.toString()) || "Homework",
+          uid: row.uid,
+          member: member
+            ? {
+                name: member.name || "EWUCSC Member",
+                studentId: member.studentId || null,
+                email: member.email || null,
+                role: member.role || "member",
+              }
+            : null,
+          response: row.response || "",
+          link: row.link || "",
+          status: row.status || "submitted",
+          submittedAt: row.submittedAt,
+          reviewedAt: row.reviewedAt || null,
+          reviewedBy: row.reviewedBy || null,
+        };
+      }),
     });
   } catch (error) {
     console.error("Homework submissions list error:", error);
