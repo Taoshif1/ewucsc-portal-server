@@ -14,7 +14,17 @@ dotenv.config();
 
 const app = express();
 
+const defaultBrowserOrigins = [
+  "https://ewucsc-portal-client.vercel.app",
+  "https://ewucsc-portal-client-taoshifs-projects.vercel.app",
+  "https://ewucsc-portal-client-git-main-taoshifs-projects.vercel.app",
+  "https://ewucsc.org",
+  "https://portal.ewucsc.org",
+  "https://resources.ewucsc.org",
+];
+
 const configuredOrigins = [
+  ...defaultBrowserOrigins,
   process.env.CLIENT_URL,
   process.env.LIVE_CLIENT_URL,
   process.env.ALLOWED_ORIGINS,
@@ -27,6 +37,11 @@ const configuredOrigins = [
 const isLocalOrigin = (origin) =>
   /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
 
+const isEwucscVercelPreview = (origin) =>
+  /^https:\/\/ewucsc-portal-client-[a-z0-9-]+-taoshifs-projects\.vercel\.app$/i.test(
+    origin,
+  );
+
 app.use(
   cors({
     origin(origin, callback) {
@@ -36,6 +51,7 @@ app.use(
 
       if (
         configuredOrigins.includes(normalized) ||
+        isEwucscVercelPreview(normalized) ||
         (process.env.NODE_ENV !== "production" && isLocalOrigin(normalized))
       ) {
         return callback(null, true);
