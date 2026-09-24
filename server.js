@@ -113,7 +113,6 @@ let server;
 
 const start = async () => {
   await connectDB();
-  await ensureBootstrapAdminSeeds();
 
   server = app.listen(PORT, () => {
     console.log(`EWUCSC server listening on port ${PORT}`);
