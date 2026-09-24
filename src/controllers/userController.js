@@ -5,7 +5,6 @@ import { isValidStudentId, normalizeStudentId, studentIdToEmail } from "../utils
 const ALLOWED_ROLES = ["admin", "executive", "sub-executive", "member"];
 const ALLOWED_APPROVAL_STATES = ["pending", "approved", "rejected", "suspended"];
 
-const studentEmail = (studentId) => `${studentId}@std.ewubd.edu`;
 
 const serializeUser = (user) => {
   if (!user) return null;
