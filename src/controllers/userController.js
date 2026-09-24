@@ -1,7 +1,8 @@
 import { getUserCollection } from "../models/userModel.js";
 import { generateToken } from "../utils/generateToken.js";
 import { isValidStudentId, normalizeStudentId, studentIdToEmail } from "../utils/ewuIdentity.js";
-import { isBootstrapAdminEmail, provisionFirebaseUser } from "../services/bootstrapAdmins.js";
+import { provisionFirebaseUser } from "../services/bootstrapAdmins.js";
+import { evaluateMemberLogin, isBootstrapAdminEmail } from "../utils/authPolicy.js";
 
 const ALLOWED_ROLES = ["admin", "executive", "sub-executive", "member"];
 const ALLOWED_APPROVAL_STATES = ["pending", "approved", "rejected", "suspended"];
@@ -63,7 +64,7 @@ export const createUser = async (req, res) => {
               email: expectedEmail,
               role: "admin",
               approvalStatus: "approved",
-              emailVerificationRequired: true,
+              emailVerificationRequired: false,
               isActive: true,
               updatedAt: now,
               approvedAt: duplicate.approvedAt || now,
@@ -75,7 +76,7 @@ export const createUser = async (req, res) => {
         const linkedAdmin = await users.findOne({ _id: duplicate._id });
 
         return res.status(200).send({
-          message: "Admin account linked. Verify your EWU email before logging in.",
+          message: "Admin account linked and ready for login.",
           user: serializeUser(linkedAdmin),
           approvalStatus: "approved",
         });
@@ -95,7 +96,7 @@ export const createUser = async (req, res) => {
       email: expectedEmail,
       role: bootstrapAdmin ? "admin" : "member",
       approvalStatus: bootstrapAdmin ? "approved" : "pending",
-      emailVerificationRequired: true,
+      emailVerificationRequired: bootstrapAdmin ? false : true,
       ctfScore: 0,
       solvedChallenges: 0,
       homeworkCompleted: 0,
@@ -110,7 +111,7 @@ export const createUser = async (req, res) => {
 
     return res.status(201).send({
       message: bootstrapAdmin
-        ? "Admin account created. Verify your EWU email before logging in."
+        ? "Admin account created and ready for login."
         : "Registration submitted. Verify your EWU email and wait for admin approval.",
       user: serializeUser(newUser),
       approvalStatus: newUser.approvalStatus,
@@ -141,39 +142,28 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    if (user.isActive === false) {
-      return res.status(403).send({ message: "This account is inactive", code: "ACCOUNT_INACTIVE" });
-    }
+    const loginDecision = evaluateMemberLogin({
+      user,
+      firebaseEmailVerified: req.firebaseUser.email_verified,
+    });
 
-    if (user.emailVerificationRequired && !req.firebaseUser.email_verified) {
-      return res.status(403).send({
-        message: "Verify your EWU student email before logging in",
-        code: "EMAIL_NOT_VERIFIED",
+    if (!loginDecision.allowed) {
+      const messages = {
+        USER_NOT_FOUND: "User not found",
+        ACCOUNT_INACTIVE: "This account is inactive",
+        EMAIL_NOT_VERIFIED: "Verify your EWU student email before logging in",
+        PENDING_APPROVAL: "Your EWUCSC membership is waiting for admin approval",
+        ACCOUNT_REJECTED: "Your EWUCSC membership request was not approved",
+        ACCOUNT_SUSPENDED: "Your EWUCSC account is suspended",
+      };
+
+      return res.status(loginDecision.status).send({
+        message: messages[loginDecision.code] || "Portal access denied",
+        code: loginDecision.code,
       });
     }
 
     const approvalStatus = effectiveApprovalStatus(user);
-
-    if (approvalStatus === "pending") {
-      return res.status(403).send({
-        message: "Your EWUCSC membership is waiting for admin approval",
-        code: "PENDING_APPROVAL",
-      });
-    }
-
-    if (approvalStatus === "rejected") {
-      return res.status(403).send({
-        message: "Your EWUCSC membership request was not approved",
-        code: "ACCOUNT_REJECTED",
-      });
-    }
-
-    if (approvalStatus === "suspended") {
-      return res.status(403).send({
-        message: "Your EWUCSC account is suspended",
-        code: "ACCOUNT_SUSPENDED",
-      });
-    }
 
     const token = generateToken({ ...user, approvalStatus: "approved" });
 

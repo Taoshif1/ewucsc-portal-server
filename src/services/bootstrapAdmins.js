@@ -4,24 +4,16 @@ import {
   normalizeStudentId,
   studentIdToEmail,
 } from "../utils/ewuIdentity.js";
-
-const REQUIRED_BOOTSTRAP_ADMINS = [
-  "2023-3-60-376@std.ewubd.edu",
-];
+import {
+  getConfiguredBootstrapAdminEmails,
+  isBootstrapAdminEmail,
+} from "../utils/authPolicy.js";
 
 const normalizeEmail = (value = "") =>
   String(value).trim().toLowerCase();
 
-const configuredBootstrapAdmins = () => [
-  ...REQUIRED_BOOTSTRAP_ADMINS,
-  ...(process.env.BOOTSTRAP_ADMIN_EMAILS || "")
-    .split(",")
-    .map(normalizeEmail)
-    .filter(Boolean),
-];
-
 export const getBootstrapAdminEmails = () =>
-  new Set(configuredBootstrapAdmins().map(normalizeEmail));
+  getConfiguredBootstrapAdminEmails();
 
 export const studentIdFromEwuEmail = (email = "") => {
   const normalizedEmail = normalizeEmail(email);
@@ -35,9 +27,6 @@ export const studentIdFromEwuEmail = (email = "") => {
 
   return isValidStudentId(studentId) ? studentId : null;
 };
-
-export const isBootstrapAdminEmail = (email = "") =>
-  getBootstrapAdminEmails().has(normalizeEmail(email));
 
 export const ensureBootstrapAdminSeeds = async () => {
   const users = await getUserCollection();
@@ -56,7 +45,7 @@ export const ensureBootstrapAdminSeeds = async () => {
       studentId,
       role: "admin",
       approvalStatus: "approved",
-      emailVerificationRequired: true,
+      emailVerificationRequired: false,
       isActive: true,
       updatedAt: now,
       approvedAt: existing?.approvedAt || now,
@@ -119,7 +108,7 @@ export const provisionFirebaseUser = async (firebaseUser) => {
         role: "admin",
         approvalStatus: "approved",
         isActive: true,
-        emailVerificationRequired: true,
+        emailVerificationRequired: false,
         approvedAt: user.approvedAt || now,
         approvedBy: user.approvedBy || "bootstrap-config",
       });
@@ -138,7 +127,7 @@ export const provisionFirebaseUser = async (firebaseUser) => {
     email,
     role: bootstrapAdmin ? "admin" : "member",
     approvalStatus: bootstrapAdmin ? "approved" : "pending",
-    emailVerificationRequired: true,
+    emailVerificationRequired: bootstrapAdmin ? false : true,
     ctfScore: 0,
     solvedChallenges: 0,
     homeworkCompleted: 0,
@@ -177,3 +166,4 @@ export const bootstrapAdminsReady = async () => {
 
   return count === emails.length;
 };
+
