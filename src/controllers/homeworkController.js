@@ -161,3 +161,76 @@ export const submitHomework = async (req, res) => {
     return res.status(500).send({ message: "Failed to submit homework" });
   }
 };
+
+
+export const listHomeworkSubmissions = async (req, res) => {
+  try {
+    const submissions = await getHomeworkSubmissionCollection();
+    const homeworks = await getHomeworkCollection();
+    const rows = await submissions.find({}).sort({ submittedAt: -1 }).limit(500).toArray();
+
+    const homeworkIds = [...new Set(rows.map((row) => row.homeworkId.toString()))].map(
+      (id) => new ObjectId(id),
+    );
+    const homeworkRows = await homeworks
+      .find({ _id: { $in: homeworkIds } })
+      .project({ title: 1 })
+      .toArray();
+    const homeworkMap = new Map(homeworkRows.map((row) => [row._id.toString(), row.title]));
+
+    return res.send({
+      submissions: rows.map((row) => ({
+        id: row._id.toString(),
+        homeworkId: row.homeworkId.toString(),
+        homeworkTitle: homeworkMap.get(row.homeworkId.toString()) || "Homework",
+        uid: row.uid,
+        response: row.response || "",
+        link: row.link || "",
+        status: row.status || "submitted",
+        submittedAt: row.submittedAt,
+        reviewedAt: row.reviewedAt || null,
+        reviewedBy: row.reviewedBy || null,
+      })),
+    });
+  } catch (error) {
+    console.error("Homework submissions list error:", error);
+    return res.status(500).send({ message: "Failed to load homework submissions" });
+  }
+};
+
+export const reviewHomeworkSubmission = async (req, res) => {
+  try {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send({ message: "Invalid submission ID" });
+    }
+
+    const allowed = ["submitted", "reviewed", "accepted", "revision-requested"];
+    const status = String(req.body.status || "");
+
+    if (!allowed.includes(status)) {
+      return res.status(400).send({ message: "Invalid review status" });
+    }
+
+    const submissions = await getHomeworkSubmissionCollection();
+    const updated = await submissions.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      {
+        $set: {
+          status,
+          reviewedAt: new Date(),
+          reviewedBy: req.user.uid,
+        },
+      },
+      { returnDocument: "after" },
+    );
+
+    if (!updated) {
+      return res.status(404).send({ message: "Submission not found" });
+    }
+
+    return res.send({ message: "Submission reviewed", status: updated.status });
+  } catch (error) {
+    console.error("Homework review error:", error);
+    return res.status(500).send({ message: "Failed to review submission" });
+  }
+};
