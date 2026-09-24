@@ -1,6 +1,7 @@
 import { getUserCollection } from "../models/userModel.js";
 import { generateToken } from "../utils/generateToken.js";
 import { isValidStudentId, normalizeStudentId, studentIdToEmail } from "../utils/ewuIdentity.js";
+import { isBootstrapAdminEmail, provisionFirebaseUser } from "../services/bootstrapAdmins.js";
 
 const ALLOWED_ROLES = ["admin", "executive", "sub-executive", "member"];
 const ALLOWED_APPROVAL_STATES = ["pending", "approved", "rejected", "suspended"];
@@ -44,11 +45,42 @@ export const createUser = async (req, res) => {
       });
     }
 
+    const now = new Date();
+    const bootstrapAdmin = isBootstrapAdminEmail(expectedEmail);
     const duplicate = await users.findOne({
       $or: [{ uid }, { studentId }, { email: expectedEmail }],
     });
 
     if (duplicate) {
+      if (bootstrapAdmin && (!duplicate.uid || duplicate.uid === uid)) {
+        await users.updateOne(
+          { _id: duplicate._id },
+          {
+            $set: {
+              uid,
+              name: name.trim(),
+              studentId,
+              email: expectedEmail,
+              role: "admin",
+              approvalStatus: "approved",
+              emailVerificationRequired: true,
+              isActive: true,
+              updatedAt: now,
+              approvedAt: duplicate.approvedAt || now,
+              approvedBy: duplicate.approvedBy || "bootstrap-config",
+            },
+          },
+        );
+
+        const linkedAdmin = await users.findOne({ _id: duplicate._id });
+
+        return res.status(200).send({
+          message: "Admin account linked. Verify your EWU email before logging in.",
+          user: serializeUser(linkedAdmin),
+          approvalStatus: "approved",
+        });
+      }
+
       return res.status(409).send({
         message: "An account already exists for this EWU Student ID",
         user: serializeUser(duplicate),
@@ -56,30 +88,32 @@ export const createUser = async (req, res) => {
       });
     }
 
-    const now = new Date();
     const newUser = {
       uid,
       name: name.trim(),
       studentId,
       email: expectedEmail,
-      role: "member",
-      approvalStatus: "pending",
+      role: bootstrapAdmin ? "admin" : "member",
+      approvalStatus: bootstrapAdmin ? "approved" : "pending",
       emailVerificationRequired: true,
       ctfScore: 0,
       solvedChallenges: 0,
+      homeworkCompleted: 0,
       isActive: true,
       createdAt: now,
       updatedAt: now,
-      approvedAt: null,
-      approvedBy: null,
+      approvedAt: bootstrapAdmin ? now : null,
+      approvedBy: bootstrapAdmin ? "bootstrap-config" : null,
     };
 
     await users.insertOne(newUser);
 
     return res.status(201).send({
-      message: "Registration submitted. Verify your EWU email and wait for admin approval.",
+      message: bootstrapAdmin
+        ? "Admin account created. Verify your EWU email before logging in."
+        : "Registration submitted. Verify your EWU email and wait for admin approval.",
       user: serializeUser(newUser),
-      approvalStatus: "pending",
+      approvalStatus: newUser.approvalStatus,
     });
   } catch (error) {
     console.error("Create user error:", error);
@@ -91,10 +125,20 @@ export const loginUser = async (req, res) => {
   try {
     const users = await getUserCollection();
     const uid = req.firebaseUser.uid;
-    const user = await users.findOne({ uid });
+    const firebaseEmail = req.firebaseUser.email?.trim().toLowerCase();
+
+    let user = await users.findOne({ uid });
+
+    if (!user || isBootstrapAdminEmail(firebaseEmail)) {
+      const provisioned = await provisionFirebaseUser(req.firebaseUser);
+      if (provisioned) user = provisioned;
+    }
 
     if (!user) {
-      return res.status(404).send({ message: "User not found", code: "USER_NOT_FOUND" });
+      return res.status(404).send({
+        message: "No EWU member profile could be created for this Firebase account",
+        code: "USER_NOT_FOUND",
+      });
     }
 
     if (user.isActive === false) {

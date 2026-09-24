@@ -10,6 +10,7 @@ import challengeRoutes from "./src/routes/challengeRoutes.js";
 import homeworkRoutes from "./src/routes/homeworkRoutes.js";
 import contentRoutes from "./src/routes/contentRoutes.js";
 import contactRoutes from "./src/routes/contactRoutes.js";
+import { bootstrapAdminsReady, ensureBootstrapAdminSeeds } from "./src/services/bootstrapAdmins.js";
 
 dotenv.config();
 
@@ -71,9 +72,13 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/api/health", async (req, res) => {
   try {
     await connectDB();
+    await ensureBootstrapAdminSeeds();
+    const adminBootstrapReady = await bootstrapAdminsReady();
+
     return res.send({
       ok: true,
       service: "ewucsc-portal-server",
+      adminBootstrapReady,
       timestamp: new Date().toISOString(),
     });
   } catch {
