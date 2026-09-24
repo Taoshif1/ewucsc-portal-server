@@ -131,24 +131,22 @@ NODE_ENV=development
 MONGO_URI=
 JWT_SECRET=
 
-FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=
-FIREBASE_PRIVATE_KEY=
+FIREBASE_PROJECT_ID=smart-deals-37b05
 
 CLIENT_URL=http://localhost:5173
 LIVE_CLIENT_URL=
 ALLOWED_ORIGINS=
 ```
 
-### Firebase Admin
+### Firebase token verification
 
-Production uses environment-based Firebase Admin credentials.
+The server does not need a Firebase service-account private key for its current authentication flow.
 
-`FIREBASE_PRIVATE_KEY` may contain escaped `\n`; the server normalizes them.
+The client signs in with Firebase and sends its Firebase ID token to the API. The API verifies that JWT against Google's published Firebase signing certificates and validates the expected project ID, issuer, audience, timestamps and subject.
 
-For local development only, the server can fall back to the gitignored `serviceAccountKey.json`.
+The current project defaults to `smart-deals-37b05`; `FIREBASE_PROJECT_ID` can override it for another Firebase project.
 
-Never commit that file.
+No `serviceAccountKey.json`, `FIREBASE_PRIVATE_KEY`, or `FIREBASE_CLIENT_EMAIL` is required for token verification.
 
 ## Health check
 
