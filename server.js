@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 
 import userRoutes from "./src/routes/userRoutes.js";
+import ctfRoutes from "./src/routes/ctfRoutes.js";
 
 
 dotenv.config();
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use(helmet());
 
 app.use("/api", userRoutes);
+app.use("/api/ctf", ctfRoutes);
 
 app.get("/", (req, res) => {
   res.send("EWUCSC Server Running");
