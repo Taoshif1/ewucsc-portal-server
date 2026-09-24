@@ -199,3 +199,8 @@ https://resources.ewucsc.org
 ```
 
 Do not merge/deploy a frontend that expects these new APIs until the corresponding server release is reachable.
+
+
+## Deployment recovery
+
+The current `main` branch includes the empty-database auth recovery and bootstrap-admin flow. A fresh production deployment should be triggered after any Vercel build-rate-limit window clears.
