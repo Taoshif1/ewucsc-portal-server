@@ -4,24 +4,16 @@ import {
   normalizeStudentId,
   studentIdToEmail,
 } from "../utils/ewuIdentity.js";
-
-const REQUIRED_BOOTSTRAP_ADMINS = [
-  "2023-3-60-376@std.ewubd.edu",
-];
+import {
+  getConfiguredBootstrapAdminEmails,
+  isBootstrapAdminEmail,
+} from "../utils/authPolicy.js";
 
 const normalizeEmail = (value = "") =>
   String(value).trim().toLowerCase();
 
-const configuredBootstrapAdmins = () => [
-  ...REQUIRED_BOOTSTRAP_ADMINS,
-  ...(process.env.BOOTSTRAP_ADMIN_EMAILS || "")
-    .split(",")
-    .map(normalizeEmail)
-    .filter(Boolean),
-];
-
 export const getBootstrapAdminEmails = () =>
-  new Set(configuredBootstrapAdmins().map(normalizeEmail));
+  getConfiguredBootstrapAdminEmails();
 
 export const studentIdFromEwuEmail = (email = "") => {
   const normalizedEmail = normalizeEmail(email);
@@ -178,7 +170,3 @@ export const bootstrapAdminsReady = async () => {
   return count === emails.length;
 };
 
-
-export const requiresVerifiedFirebaseEmail = (user = {}) =>
-  Boolean(user.emailVerificationRequired) &&
-  !isBootstrapAdminEmail(user.email);
