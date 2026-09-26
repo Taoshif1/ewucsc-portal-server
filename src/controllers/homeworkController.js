@@ -4,6 +4,7 @@ import {
   getHomeworkSubmissionCollection,
 } from "../models/homeworkModel.js";
 import { getUserCollection } from "../models/userModel.js";
+import { normalizeAttachments } from "../utils/attachments.js";
 
 const serialize = (doc) => ({ ...doc, id: doc._id.toString(), _id: undefined });
 
@@ -49,7 +50,7 @@ export const listAllHomeworks = async (req, res) => {
 
 export const createHomework = async (req, res) => {
   try {
-    const { title, description, dueAt, published = false } = req.body;
+    const { title, description, dueAt, attachments = [], published = false } = req.body;
 
     if (!title?.trim() || !description?.trim()) {
       return res.status(400).send({ message: "Title and description are required" });
@@ -65,6 +66,7 @@ export const createHomework = async (req, res) => {
       title: title.trim().slice(0, 160),
       description: description.trim().slice(0, 6000),
       dueAt: due,
+      attachments: normalizeAttachments(attachments),
       published: Boolean(published),
       archived: false,
       createdBy: req.user.uid,
@@ -86,11 +88,15 @@ export const updateHomework = async (req, res) => {
       return res.status(400).send({ message: "Invalid homework ID" });
     }
 
-    const allowed = ["title", "description", "published", "archived"];
+    const allowed = ["title", "description", "attachments", "published", "archived"];
     const update = { updatedAt: new Date() };
 
     for (const field of allowed) {
       if (Object.hasOwn(req.body, field)) update[field] = req.body[field];
+    }
+
+    if (Object.hasOwn(update, "attachments")) {
+      update.attachments = normalizeAttachments(update.attachments);
     }
 
     if (Object.hasOwn(req.body, "dueAt")) {
