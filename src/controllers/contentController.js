@@ -49,6 +49,23 @@ const normalizeImageUrl = (value = "") => {
   return imageUrl;
 };
 
+const normalizeImageUrls = (values = [], fallback = "") => {
+  const source = Array.isArray(values) ? values : [];
+  const normalized = [];
+
+  for (const value of source.slice(0, 10)) {
+    const url = normalizeImageUrl(value);
+    if (url && !normalized.includes(url)) normalized.push(url);
+  }
+
+  if (normalized.length === 0 && fallback) {
+    const legacy = normalizeImageUrl(fallback);
+    if (legacy) normalized.push(legacy);
+  }
+
+  return normalized;
+};
+
 const normalizeEventDate = (value = "") => {
   const eventDate = String(value || "").trim();
 
@@ -114,6 +131,7 @@ export const createContent = async (req, res) => {
       excerpt = "",
       body = "",
       imageUrl = "",
+      imageUrls = [],
       eventDate = "",
       published = false,
     } = req.body;
@@ -126,11 +144,11 @@ export const createContent = async (req, res) => {
       return res.status(400).send({ message: "Blog body is required" });
     }
 
-    let normalizedImageUrl;
+    let normalizedImageUrls;
     let normalizedEventDate;
 
     try {
-      normalizedImageUrl = normalizeImageUrl(imageUrl);
+      normalizedImageUrls = normalizeImageUrls(imageUrls, imageUrl);
       normalizedEventDate = normalizeEventDate(eventDate);
     } catch (error) {
       if (error.message === "INVALID_IMAGE_URL") {
@@ -161,7 +179,8 @@ export const createContent = async (req, res) => {
       title: title.trim().slice(0, 180),
       excerpt: String(excerpt || "").trim().slice(0, 600),
       body: String(body || "").trim().slice(0, 30000),
-      imageUrl: normalizedImageUrl,
+      imageUrl: normalizedImageUrls[0] || "",
+      imageUrls: normalizedImageUrls,
       eventDate: normalizedEventDate,
       published: Boolean(published),
       archived: false,
@@ -205,15 +224,20 @@ export const updateContent = async (req, res) => {
       if (Object.hasOwn(req.body, field)) update[field] = req.body[field];
     }
 
-    if (Object.hasOwn(req.body, "imageUrl")) {
+    if (Object.hasOwn(req.body, "imageUrls") || Object.hasOwn(req.body, "imageUrl")) {
       try {
-        update.imageUrl = normalizeImageUrl(req.body.imageUrl);
+        const normalizedImageUrls = normalizeImageUrls(
+          Object.hasOwn(req.body, "imageUrls") ? req.body.imageUrls : [],
+          req.body.imageUrl || "",
+        );
+        update.imageUrls = normalizedImageUrls;
+        update.imageUrl = normalizedImageUrls[0] || "";
       } catch (error) {
         if (error.message === "INVALID_IMAGE_URL") {
-          return res.status(400).send({ message: "Image URL must be a valid http/https URL" });
+          return res.status(400).send({ message: "Every image must use a valid http/https URL" });
         }
         if (error.message === "IMAGE_URL_TOO_LONG") {
-          return res.status(400).send({ message: "Image URL is too long" });
+          return res.status(400).send({ message: "An image URL is too long" });
         }
         throw error;
       }
