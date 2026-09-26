@@ -34,15 +34,16 @@ export const ensureBootstrapAdminSeeds = async () => {
 
   for (const email of getBootstrapAdminEmails()) {
     const studentId = studentIdFromEwuEmail(email);
-    if (!studentId) continue;
 
-    const existing = await users.findOne({
-      $or: [{ email }, { studentId }],
-    });
+    const identityQuery = studentId
+      ? { $or: [{ email }, { studentId }] }
+      : { email };
+
+    const existing = await users.findOne(identityQuery);
 
     const baseUpdate = {
       email,
-      studentId,
+      ...(studentId ? { studentId } : {}),
       role: "admin",
       approvalStatus: "approved",
       emailVerificationRequired: false,
@@ -81,25 +82,26 @@ export const provisionFirebaseUser = async (firebaseUser) => {
   const users = await getUserCollection();
   const email = normalizeEmail(firebaseUser?.email);
   const studentId = studentIdFromEwuEmail(email);
-
-  if (!studentId) return null;
-
   const bootstrapAdmin = isBootstrapAdminEmail(email);
+
+  if (!studentId && !bootstrapAdmin) return null;
   const now = new Date();
 
   let user = await users.findOne({ uid: firebaseUser.uid });
 
   if (!user) {
-    user = await users.findOne({
-      $or: [{ email }, { studentId }],
-    });
+    user = await users.findOne(
+      studentId
+        ? { $or: [{ email }, { studentId }] }
+        : { email },
+    );
   }
 
   if (user) {
     const update = {
       uid: firebaseUser.uid,
       email,
-      studentId,
+      ...(studentId ? { studentId } : {}),
       updatedAt: now,
     };
 
@@ -123,7 +125,7 @@ export const provisionFirebaseUser = async (firebaseUser) => {
     name:
       String(firebaseUser.name || "").trim() ||
       (bootstrapAdmin ? "EWUCSC Admin" : studentId),
-    studentId,
+    ...(studentId ? { studentId } : {}),
     email,
     role: bootstrapAdmin ? "admin" : "member",
     approvalStatus: bootstrapAdmin ? "approved" : "pending",
