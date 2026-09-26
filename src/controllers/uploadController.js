@@ -2,7 +2,7 @@ import { GridFSBucket, ObjectId } from "mongodb";
 import { connectDB } from "../config/db.js";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-const PUBLIC_SCOPES = new Set(["content", "gallery"]);
+const PUBLIC_SCOPES = new Set(["content", "gallery", "partner"]);
 const PRIVATE_SCOPES = new Set(["challenge", "homework"]);
 const ALLOWED_EXTENSIONS = new Set([
   "jpg", "jpeg", "png", "webp", "gif", "avif",
@@ -33,12 +33,6 @@ const isAllowedUpload = (name, mimeType) => {
 const getBucket = async () => {
   const db = await connectDB();
   return { db, bucket: new GridFSBucket(db, { bucketName: "media" }) };
-};
-
-const absoluteAssetUrl = (req, visibility, id) => {
-  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const protocol = forwardedProto || req.protocol || "https";
-  return `${protocol}://${req.get("host")}/api/uploads/${visibility}/${id}`;
 };
 
 export const uploadAsset = async (req, res) => {
@@ -99,6 +93,7 @@ export const uploadAsset = async (req, res) => {
 
     const id = upload.id.toString();
     const apiPath = `/uploads/${visibility}/${id}`;
+    const publicUrl = isPublic ? `/api/uploads/public/${id}` : null;
 
     return res.status(201).send({
       message: "Upload complete",
@@ -110,7 +105,7 @@ export const uploadAsset = async (req, res) => {
         scope,
         visibility,
         apiPath,
-        url: isPublic ? absoluteAssetUrl(req, visibility, id) : null,
+        url: publicUrl,
       },
     });
   } catch (error) {

@@ -1,10 +1,15 @@
 import { ObjectId } from "mongodb";
 import { getGalleryCollection } from "../models/galleryModel.js";
+import { normalizePublicMediaUrl } from "../utils/publicMedia.js";
 
 const serialize = (doc) => {
   if (!doc) return null;
   const { _id, ...rest } = doc;
-  return { ...rest, id: _id.toString() };
+  return {
+    ...rest,
+    imageUrl: normalizePublicMediaUrl(rest.imageUrl, rest.assetId) || "",
+    id: _id.toString(),
+  };
 };
 
 const normalizeDate = (value = "") => {
@@ -17,16 +22,8 @@ const normalizeDate = (value = "") => {
     : date;
 };
 
-const normalizeImageUrl = (value = "") => {
-  const imageUrl = String(value || "").trim();
-  if (!imageUrl) return "";
-  try {
-    const parsed = new URL(imageUrl);
-    return ["http:", "https:"].includes(parsed.protocol) ? imageUrl.slice(0, 2000) : null;
-  } catch {
-    return null;
-  }
-};
+const normalizeImageUrl = (value = "", assetId = "") =>
+  normalizePublicMediaUrl(value, assetId);
 
 export const listGallery = async (req, res) => {
   try {
@@ -66,7 +63,7 @@ export const createGalleryItem = async (req, res) => {
       published = true,
     } = req.body;
 
-    const normalizedImage = normalizeImageUrl(imageUrl);
+    const normalizedImage = normalizeImageUrl(imageUrl, assetId);
     if (!normalizedImage) {
       return res.status(400).send({ message: "Upload a gallery image first" });
     }
@@ -128,7 +125,7 @@ export const updateGalleryItem = async (req, res) => {
     }
 
     if (Object.hasOwn(req.body, "imageUrl")) {
-      const normalizedImage = normalizeImageUrl(req.body.imageUrl);
+      const normalizedImage = normalizeImageUrl(req.body.imageUrl, req.body.assetId || existing.assetId);
       if (!normalizedImage) {
         return res.status(400).send({ message: "Invalid image URL" });
       }

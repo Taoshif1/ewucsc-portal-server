@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getContentCollection } from "../models/contentModel.js";
+import { normalizePublicMediaUrl, normalizePublicMediaUrls } from "../utils/publicMedia.js";
 
 const TYPES = new Set(["announcements", "blogs"]);
 
@@ -14,7 +15,14 @@ const slugify = (value = "") =>
 const serialize = (doc) => {
   if (!doc) return null;
   const { _id, ...rest } = doc;
-  return { ...rest, id: _id.toString() };
+  const imageUrls = normalizePublicMediaUrls(rest.imageUrls, rest.imageUrl);
+
+  return {
+    ...rest,
+    imageUrl: imageUrls[0] || "",
+    imageUrls,
+    id: _id.toString(),
+  };
 };
 
 const validateType = (req, res) => {
@@ -27,40 +35,22 @@ const validateType = (req, res) => {
 };
 
 const normalizeImageUrl = (value = "") => {
-  const imageUrl = String(value || "").trim();
-
-  if (!imageUrl) return "";
-
-  if (imageUrl.length > 2000) {
-    throw new Error("IMAGE_URL_TOO_LONG");
-  }
-
-  let parsed;
-  try {
-    parsed = new URL(imageUrl);
-  } catch {
-    throw new Error("INVALID_IMAGE_URL");
-  }
-
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("INVALID_IMAGE_URL");
-  }
-
-  return imageUrl;
+  const normalized = normalizePublicMediaUrl(value);
+  if (normalized === null) throw new Error("INVALID_IMAGE_URL");
+  return normalized;
 };
 
 const normalizeImageUrls = (values = [], fallback = "") => {
-  const source = Array.isArray(values) ? values : [];
-  const normalized = [];
+  const normalized = normalizePublicMediaUrls(values, fallback);
 
-  for (const value of source.slice(0, 10)) {
-    const url = normalizeImageUrl(value);
-    if (url && !normalized.includes(url)) normalized.push(url);
+  for (const value of Array.isArray(values) ? values.slice(0, 10) : []) {
+    if (value && normalizePublicMediaUrl(value) === null) {
+      throw new Error("INVALID_IMAGE_URL");
+    }
   }
 
-  if (normalized.length === 0 && fallback) {
-    const legacy = normalizeImageUrl(fallback);
-    if (legacy) normalized.push(legacy);
+  if (fallback && normalizePublicMediaUrl(fallback) === null) {
+    throw new Error("INVALID_IMAGE_URL");
   }
 
   return normalized;

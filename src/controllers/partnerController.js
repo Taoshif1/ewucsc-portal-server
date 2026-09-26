@@ -1,12 +1,17 @@
 import { ObjectId } from "mongodb";
 import { getPartnersCollection } from "../models/partnerModel.js";
+import { normalizePublicMediaUrl } from "../utils/publicMedia.js";
 
 const TYPES = new Set(["sponsor", "club_partner"]);
 
 const serialize = (doc) => {
   if (!doc) return null;
   const { _id, ...rest } = doc;
-  return { ...rest, id: _id.toString() };
+  return {
+    ...rest,
+    logoUrl: normalizePublicMediaUrl(rest.logoUrl) || "",
+    id: _id.toString(),
+  };
 };
 
 const normalizeUrl = (value = "") => {
@@ -75,7 +80,7 @@ export const createPartner = async (req, res) => {
     }
 
     const normalizedWebsite = normalizeUrl(websiteUrl);
-    const normalizedLogo = normalizeUrl(logoUrl);
+    const normalizedLogo = normalizePublicMediaUrl(logoUrl);
 
     if (normalizedWebsite === null || normalizedLogo === null) {
       return res.status(400).send({ message: "Website/logo must use a valid http/https URL" });
@@ -148,7 +153,7 @@ export const updatePartner = async (req, res) => {
     }
 
     if (Object.hasOwn(req.body, "logoUrl")) {
-      const value = normalizeUrl(req.body.logoUrl);
+      const value = normalizePublicMediaUrl(req.body.logoUrl);
       if (value === null) {
         return res.status(400).send({ message: "Invalid logo URL" });
       }
