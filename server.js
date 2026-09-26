@@ -15,6 +15,7 @@ import galleryRoutes from "./src/routes/galleryRoutes.js";
 import formRoutes from "./src/routes/formRoutes.js";
 import siteSettingsRoutes from "./src/routes/siteSettingsRoutes.js";
 import partnerRoutes from "./src/routes/partnerRoutes.js";
+import vpResourceRoutes from "./src/routes/vpResourceRoutes.js";
 import { bootstrapAdminsReady, ensureBootstrapAdminSeeds } from "./src/services/bootstrapAdmins.js";
 
 dotenv.config();
@@ -102,6 +103,7 @@ app.use("/api/gallery", galleryRoutes);
 app.use("/api/forms", formRoutes);
 app.use("/api/site-settings", siteSettingsRoutes);
 app.use("/api/partners", partnerRoutes);
+app.use("/api/vp-resources", vpResourceRoutes);
 
 app.get("/", (req, res) => {
   res.send("EWUCSC Server Running");
