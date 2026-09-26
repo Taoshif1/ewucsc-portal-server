@@ -10,6 +10,9 @@ import challengeRoutes from "./src/routes/challengeRoutes.js";
 import homeworkRoutes from "./src/routes/homeworkRoutes.js";
 import contentRoutes from "./src/routes/contentRoutes.js";
 import contactRoutes from "./src/routes/contactRoutes.js";
+import uploadRoutes from "./src/routes/uploadRoutes.js";
+import galleryRoutes from "./src/routes/galleryRoutes.js";
+import formRoutes from "./src/routes/formRoutes.js";
 import { bootstrapAdminsReady, ensureBootstrapAdminSeeds } from "./src/services/bootstrapAdmins.js";
 
 dotenv.config();
@@ -92,6 +95,9 @@ app.use("/api/challenges", challengeRoutes);
 app.use("/api/homeworks", homeworkRoutes);
 app.use("/api/content", contentRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/gallery", galleryRoutes);
+app.use("/api/forms", formRoutes);
 
 app.get("/", (req, res) => {
   res.send("EWUCSC Server Running");
