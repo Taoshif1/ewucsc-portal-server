@@ -13,18 +13,22 @@ test("configured bootstrap admin is recognized", () => {
   );
 });
 
-test("approved bootstrap admin can login without Firebase email verification", () => {
+test("bootstrap admin must verify Firebase email when verification is required", () => {
   const user = {
-    email: "2023-3-60-376@std.ewubd.edu",
+    email: "ewucsc@ewubd.edu",
     role: "admin",
     approvalStatus: "approved",
     emailVerificationRequired: true,
     isActive: true,
   };
 
-  assert.equal(requiresVerifiedFirebaseEmail(user), false);
+  assert.equal(requiresVerifiedFirebaseEmail(user), true);
   assert.deepEqual(
     evaluateMemberLogin({ user, firebaseEmailVerified: false }),
+    { allowed: false, status: 403, code: "EMAIL_NOT_VERIFIED" },
+  );
+  assert.deepEqual(
+    evaluateMemberLogin({ user, firebaseEmailVerified: true }),
     { allowed: true, status: 200, code: null },
   );
 });
