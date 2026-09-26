@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createContent,
+  deleteContent,
   listAllContent,
   listPublishedContent,
   getPublishedContentBySlug,
@@ -35,6 +36,13 @@ router.patch(
   verifyApprovedMember,
   allowRoles("admin", "executive"),
   updateContent,
+);
+router.delete(
+  "/:type/admin/:id",
+  verifyJWT,
+  verifyApprovedMember,
+  allowRoles("admin", "executive"),
+  deleteContent,
 );
 
 export default router;
