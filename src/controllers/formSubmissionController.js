@@ -3,6 +3,7 @@ import { getFormDefinitionCollection } from "../models/formDefinitionModel.js";
 import { isFormAcceptingSubmissions } from "./formDefinitionController.js";
 
 const FORM_KEY_RE = /^[a-z0-9][a-z0-9-]{1,79}$/;
+const EWU_STUDENT_ID_RE = /^\d{4}-\d-\d{2}-\d{2,3}$/;
 
 const normalizeFormKey = (value = "") => String(value).trim().toLowerCase();
 
@@ -58,9 +59,16 @@ const validateRecruitmentBasics = (definition, data) => {
     }
   }
 
+  const studentId = String(data["Student ID"] || "").trim().replace(/\s+/g, "");
+  if (!EWU_STUDENT_ID_RE.test(studentId)) {
+    return "Enter a valid EWU Student ID";
+  }
+
   const email = String(data["University Email"] || "").trim().toLowerCase();
-  if (!/^[^\s@]+@std\.ewubd\.edu$/i.test(email)) {
-    return "Use your EWU student email";
+  const expectedEmail = `${studentId}@std.ewubd.edu`.toLowerCase();
+
+  if (email !== expectedEmail) {
+    return "University email must match your EWU Student ID";
   }
 
   return null;
