@@ -5,13 +5,51 @@ import {
   listFormSubmissions,
   submitForm,
 } from "../controllers/formSubmissionController.js";
+import {
+  createFormDefinition,
+  deleteFormDefinition,
+  getActiveRecruitmentForm,
+  getPublicFormDefinition,
+  listFormDefinitionsAdmin,
+  updateFormDefinition,
+} from "../controllers/formDefinitionController.js";
 import { allowRoles } from "../middleware/allowRoles.js";
 import { verifyApprovedMember } from "../middleware/verifyApprovedMember.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 
 const router = express.Router();
 
-router.post("/:formKey", submitForm);
+router.get("/public/active", getActiveRecruitmentForm);
+router.get("/public/:formKey", getPublicFormDefinition);
+
+router.get(
+  "/admin/definitions",
+  verifyJWT,
+  verifyApprovedMember,
+  allowRoles("admin"),
+  listFormDefinitionsAdmin,
+);
+router.post(
+  "/admin/definitions",
+  verifyJWT,
+  verifyApprovedMember,
+  allowRoles("admin"),
+  createFormDefinition,
+);
+router.patch(
+  "/admin/definitions/:id",
+  verifyJWT,
+  verifyApprovedMember,
+  allowRoles("admin"),
+  updateFormDefinition,
+);
+router.delete(
+  "/admin/definitions/:id",
+  verifyJWT,
+  verifyApprovedMember,
+  allowRoles("admin"),
+  deleteFormDefinition,
+);
 
 router.get(
   "/admin/summary",
@@ -34,5 +72,7 @@ router.get(
   allowRoles("admin", "executive"),
   exportFormCsv,
 );
+
+router.post("/:formKey", submitForm);
 
 export default router;

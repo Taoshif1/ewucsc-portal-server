@@ -1,4 +1,6 @@
 import { getFormSubmissionCollection } from "../models/formSubmissionModel.js";
+import { getFormDefinitionCollection } from "../models/formDefinitionModel.js";
+import { isFormAcceptingSubmissions } from "./formDefinitionController.js";
 
 const FORM_KEY_RE = /^[a-z0-9][a-z0-9-]{1,79}$/;
 
@@ -26,7 +28,7 @@ const sanitizeData = (data) => {
   for (const [rawKey, rawValue] of entries) {
     const key = String(rawKey)
       .trim()
-      .replace(/[^a-zA-Z0-9 _-]/g, "")
+      .replace(/[^a-zA-Z0-9 _/-]/g, "")
       .slice(0, 80);
 
     if (!key) continue;
@@ -39,6 +41,31 @@ const sanitizeData = (data) => {
 const csvEscape = (value) =>
   '"' + String(value ?? "").replaceAll('"', '""').replace(/\r?\n/g, " ") + '"';
 
+const validateRecruitmentBasics = (definition, data) => {
+  if (!definition?.sections?.personal) return null;
+
+  const required = [
+    "Full Name",
+    "Student ID",
+    "University Email",
+    "Department",
+    "Current Semester",
+  ];
+
+  for (const field of required) {
+    if (!String(data[field] || "").trim()) {
+      return `${field} is required`;
+    }
+  }
+
+  const email = String(data["University Email"] || "").trim().toLowerCase();
+  if (!/^[^\s@]+@std\.ewubd\.edu$/i.test(email)) {
+    return "Use your EWU student email";
+  }
+
+  return null;
+};
+
 export const submitForm = async (req, res) => {
   try {
     const formKey = normalizeFormKey(req.params.formKey);
@@ -47,19 +74,32 @@ export const submitForm = async (req, res) => {
       return res.status(400).send({ message: "Invalid form key" });
     }
 
+    const definition = await (await getFormDefinitionCollection()).findOne({ formKey });
+    if (!definition) {
+      return res.status(404).send({ message: "This form does not exist" });
+    }
+    if (!isFormAcceptingSubmissions(definition)) {
+      return res.status(409).send({ message: "This recruitment form is not accepting submissions" });
+    }
+
     const data = sanitizeData(req.body?.data);
     if (!data || Object.keys(data).length === 0) {
       return res.status(400).send({ message: "Form data is required" });
     }
 
-    // Generic honeypot support for future public forms.
     if (data.website) {
       return res.status(201).send({ message: "Submission received" });
+    }
+
+    const validationError = validateRecruitmentBasics(definition, data);
+    if (validationError) {
+      return res.status(400).send({ message: validationError });
     }
 
     const collection = await getFormSubmissionCollection();
     const doc = {
       formKey,
+      definitionId: definition._id,
       data,
       source: String(req.body?.source || "").trim().slice(0, 300),
       submittedAt: new Date(),
@@ -67,7 +107,7 @@ export const submitForm = async (req, res) => {
     };
 
     await collection.insertOne(doc);
-    return res.status(201).send({ message: "Submission received" });
+    return res.status(201).send({ message: "Application submitted successfully" });
   } catch (error) {
     console.error("Form submission error:", error);
     return res.status(500).send({ message: "Failed to submit form" });
