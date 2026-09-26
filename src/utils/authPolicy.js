@@ -3,6 +3,7 @@ const normalizeEmail = (value = "") =>
 
 const REQUIRED_BOOTSTRAP_ADMINS = [
   "2023-3-60-376@std.ewubd.edu",
+  "ewucsc@ewubd.edu",
 ];
 
 export const getConfiguredBootstrapAdminEmails = () =>
