@@ -21,36 +21,43 @@ export const createUser = async (req, res) => {
   try {
     const users = await getUserCollection();
     const { uid, name, studentId: rawStudentId } = req.body;
+    const firebaseEmail = req.firebaseUser.email?.trim().toLowerCase();
+    const bootstrapAdmin = isBootstrapAdminEmail(firebaseEmail);
     const studentId = normalizeStudentId(rawStudentId);
 
     if (!uid || req.firebaseUser.uid !== uid) {
       return res.status(403).send({ message: "Firebase identity mismatch" });
     }
 
+    if (!firebaseEmail) {
+      return res.status(400).send({ message: "Firebase account email is required" });
+    }
+
     if (!name?.trim() || name.trim().length < 2 || name.trim().length > 100) {
       return res.status(400).send({ message: "A valid full name is required" });
     }
 
-    if (!isValidStudentId(studentId)) {
+    if (!bootstrapAdmin && !isValidStudentId(studentId)) {
       return res.status(400).send({
         message: "Use a valid EWU Student ID, for example 2020-1-10-40",
       });
     }
 
-    const expectedEmail = studentIdToEmail(studentId);
-    const firebaseEmail = req.firebaseUser.email?.trim().toLowerCase();
+    const expectedEmail = bootstrapAdmin
+      ? firebaseEmail
+      : studentIdToEmail(studentId);
 
-    if (firebaseEmail !== expectedEmail) {
+    if (!bootstrapAdmin && firebaseEmail !== expectedEmail) {
       return res.status(403).send({
         message: "Your Firebase account must use the EWU student email derived from your Student ID",
       });
     }
 
     const now = new Date();
-    const bootstrapAdmin = isBootstrapAdminEmail(expectedEmail);
-    const duplicate = await users.findOne({
-      $or: [{ uid }, { studentId }, { email: expectedEmail }],
-    });
+    const identityClauses = [{ uid }, { email: expectedEmail }];
+    if (studentId) identityClauses.push({ studentId });
+
+    const duplicate = await users.findOne({ $or: identityClauses });
 
     if (duplicate) {
       if (bootstrapAdmin && (!duplicate.uid || duplicate.uid === uid)) {
@@ -60,11 +67,11 @@ export const createUser = async (req, res) => {
             $set: {
               uid,
               name: name.trim(),
-              studentId,
+              ...(studentId ? { studentId } : {}),
               email: expectedEmail,
               role: "admin",
               approvalStatus: "approved",
-              emailVerificationRequired: false,
+              emailVerificationRequired: true,
               isActive: true,
               updatedAt: now,
               approvedAt: duplicate.approvedAt || now,
@@ -76,14 +83,14 @@ export const createUser = async (req, res) => {
         const linkedAdmin = await users.findOne({ _id: duplicate._id });
 
         return res.status(200).send({
-          message: "Admin account linked and ready for login.",
+          message: "Admin account linked. Verify the official EWUCSC email before login.",
           user: serializeUser(linkedAdmin),
           approvalStatus: "approved",
         });
       }
 
       return res.status(409).send({
-        message: "An account already exists for this EWU Student ID",
+        message: "An account already exists for this EWU identity",
         user: serializeUser(duplicate),
         approvalStatus: effectiveApprovalStatus(duplicate),
       });
@@ -92,11 +99,11 @@ export const createUser = async (req, res) => {
     const newUser = {
       uid,
       name: name.trim(),
-      studentId,
+      ...(studentId ? { studentId } : {}),
       email: expectedEmail,
       role: bootstrapAdmin ? "admin" : "member",
       approvalStatus: bootstrapAdmin ? "approved" : "pending",
-      emailVerificationRequired: bootstrapAdmin ? false : true,
+      emailVerificationRequired: true,
       ctfScore: 0,
       solvedChallenges: 0,
       homeworkCompleted: 0,
@@ -111,7 +118,7 @@ export const createUser = async (req, res) => {
 
     return res.status(201).send({
       message: bootstrapAdmin
-        ? "Admin account created and ready for login."
+        ? "Admin account created. Verify ewucsc@ewubd.edu before login."
         : "Registration submitted. Verify your EWU email and wait for admin approval.",
       user: serializeUser(newUser),
       approvalStatus: newUser.approvalStatus,
@@ -151,7 +158,7 @@ export const loginUser = async (req, res) => {
       const messages = {
         USER_NOT_FOUND: "User not found",
         ACCOUNT_INACTIVE: "This account is inactive",
-        EMAIL_NOT_VERIFIED: "Verify your EWU student email before logging in",
+        EMAIL_NOT_VERIFIED: "Verify your EWU email before logging in",
         PENDING_APPROVAL: "Your EWUCSC membership is waiting for admin approval",
         ACCOUNT_REJECTED: "Your EWUCSC membership request was not approved",
         ACCOUNT_SUSPENDED: "Your EWUCSC account is suspended",
