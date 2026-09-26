@@ -26,6 +26,46 @@ const validateType = (req, res) => {
   return type;
 };
 
+const normalizeImageUrl = (value = "") => {
+  const imageUrl = String(value || "").trim();
+
+  if (!imageUrl) return "";
+
+  if (imageUrl.length > 2000) {
+    throw new Error("IMAGE_URL_TOO_LONG");
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(imageUrl);
+  } catch {
+    throw new Error("INVALID_IMAGE_URL");
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("INVALID_IMAGE_URL");
+  }
+
+  return imageUrl;
+};
+
+const normalizeEventDate = (value = "") => {
+  const eventDate = String(value || "").trim();
+
+  if (!eventDate) return "";
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    throw new Error("INVALID_EVENT_DATE");
+  }
+
+  const parsed = new Date(eventDate + "T00:00:00Z");
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== eventDate) {
+    throw new Error("INVALID_EVENT_DATE");
+  }
+
+  return eventDate;
+};
+
 export const listPublishedContent = async (req, res) => {
   try {
     const type = validateType(req, res);
@@ -52,8 +92,8 @@ export const listAllContent = async (req, res) => {
 
     const collection = await getContentCollection(type);
     const rows = await collection
-      .find({ archived: { $ne: true } })
-      .sort({ updatedAt: -1, createdAt: -1 })
+      .find({})
+      .sort({ archived: 1, updatedAt: -1, createdAt: -1 })
       .limit(300)
       .toArray();
 
@@ -69,7 +109,14 @@ export const createContent = async (req, res) => {
     const type = validateType(req, res);
     if (!type) return;
 
-    const { title, excerpt = "", body = "", published = false } = req.body;
+    const {
+      title,
+      excerpt = "",
+      body = "",
+      imageUrl = "",
+      eventDate = "",
+      published = false,
+    } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).send({ message: "Title is required" });
@@ -77,6 +124,25 @@ export const createContent = async (req, res) => {
 
     if (type === "blogs" && !body?.trim()) {
       return res.status(400).send({ message: "Blog body is required" });
+    }
+
+    let normalizedImageUrl;
+    let normalizedEventDate;
+
+    try {
+      normalizedImageUrl = normalizeImageUrl(imageUrl);
+      normalizedEventDate = normalizeEventDate(eventDate);
+    } catch (error) {
+      if (error.message === "INVALID_IMAGE_URL") {
+        return res.status(400).send({ message: "Image URL must be a valid http/https URL" });
+      }
+      if (error.message === "IMAGE_URL_TOO_LONG") {
+        return res.status(400).send({ message: "Image URL is too long" });
+      }
+      if (error.message === "INVALID_EVENT_DATE") {
+        return res.status(400).send({ message: "Event date must use YYYY-MM-DD" });
+      }
+      throw error;
     }
 
     const collection = await getContentCollection(type);
@@ -95,6 +161,8 @@ export const createContent = async (req, res) => {
       title: title.trim().slice(0, 180),
       excerpt: String(excerpt || "").trim().slice(0, 600),
       body: String(body || "").trim().slice(0, 30000),
+      imageUrl: normalizedImageUrl,
+      eventDate: normalizedEventDate,
       published: Boolean(published),
       archived: false,
       publishedAt: published ? now : null,
@@ -137,16 +205,49 @@ export const updateContent = async (req, res) => {
       if (Object.hasOwn(req.body, field)) update[field] = req.body[field];
     }
 
+    if (Object.hasOwn(req.body, "imageUrl")) {
+      try {
+        update.imageUrl = normalizeImageUrl(req.body.imageUrl);
+      } catch (error) {
+        if (error.message === "INVALID_IMAGE_URL") {
+          return res.status(400).send({ message: "Image URL must be a valid http/https URL" });
+        }
+        if (error.message === "IMAGE_URL_TOO_LONG") {
+          return res.status(400).send({ message: "Image URL is too long" });
+        }
+        throw error;
+      }
+    }
+
+    if (Object.hasOwn(req.body, "eventDate")) {
+      try {
+        update.eventDate = normalizeEventDate(req.body.eventDate);
+      } catch (error) {
+        if (error.message === "INVALID_EVENT_DATE") {
+          return res.status(400).send({ message: "Event date must use YYYY-MM-DD" });
+        }
+        throw error;
+      }
+    }
+
     if (Object.hasOwn(req.body, "published")) {
       update.published = Boolean(req.body.published);
+
       if (update.published && !existing.publishedAt) {
         update.publishedAt = new Date();
       }
     }
 
     if (update.title) update.title = String(update.title).trim().slice(0, 180);
-    if (Object.hasOwn(update, "excerpt")) update.excerpt = String(update.excerpt || "").trim().slice(0, 600);
-    if (Object.hasOwn(update, "body")) update.body = String(update.body || "").trim().slice(0, 30000);
+    if (Object.hasOwn(update, "excerpt")) {
+      update.excerpt = String(update.excerpt || "").trim().slice(0, 600);
+    }
+    if (Object.hasOwn(update, "body")) {
+      update.body = String(update.body || "").trim().slice(0, 30000);
+    }
+    if (Object.hasOwn(update, "archived")) {
+      update.archived = Boolean(update.archived);
+    }
 
     await collection.updateOne({ _id: existing._id }, { $set: update });
     const changed = await collection.findOne({ _id: existing._id });
@@ -158,6 +259,30 @@ export const updateContent = async (req, res) => {
   }
 };
 
+export const deleteContent = async (req, res) => {
+  try {
+    const type = validateType(req, res);
+    if (!type) return;
+
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send({ message: "Invalid content ID" });
+    }
+
+    const collection = await getContentCollection(type);
+    const result = await collection.deleteOne({ _id: new ObjectId(req.params.id) });
+
+    if (!result.deletedCount) {
+      return res.status(404).send({ message: "Content not found" });
+    }
+
+    return res.send({
+      message: type === "blogs" ? "Blog deleted" : "Announcement deleted",
+    });
+  } catch (error) {
+    console.error("Delete content error:", error);
+    return res.status(500).send({ message: "Failed to delete content" });
+  }
+};
 
 export const getPublishedContentBySlug = async (req, res) => {
   try {
