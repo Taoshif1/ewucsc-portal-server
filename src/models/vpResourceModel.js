@@ -48,17 +48,23 @@ let seedPromise;
 const ensureSeeded = async (collection) => {
   if (!seedPromise) {
     seedPromise = (async () => {
-      const count = await collection.countDocuments({});
-      if (count > 0) return;
-
       const now = new Date();
-      await collection.insertMany(
-        SEEDED_RESOURCES.map((item) => ({
-          ...item,
-          seeded: true,
-          createdAt: now,
-          updatedAt: now,
-        })),
+
+      await Promise.all(
+        SEEDED_RESOURCES.map((item) =>
+          collection.updateOne(
+            { resourceUrl: item.resourceUrl },
+            {
+              $setOnInsert: {
+                ...item,
+                seeded: true,
+                createdAt: now,
+                updatedAt: now,
+              },
+            },
+            { upsert: true },
+          ),
+        ),
       );
     })().catch((error) => {
       seedPromise = null;
@@ -76,6 +82,7 @@ export const getVpResourceCollection = async () => {
   await Promise.all([
     collection.createIndex({ published: 1, archived: 1, sortOrder: 1 }),
     collection.createIndex({ updatedAt: -1 }),
+    collection.createIndex({ resourceUrl: 1 }, { unique: true }),
   ]);
 
   await ensureSeeded(collection);
