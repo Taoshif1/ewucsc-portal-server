@@ -137,6 +137,12 @@ const streamAsset = async (req, res, expectedVisibility) => {
     expectedVisibility === "public" ? "public, max-age=86400" : "private, no-store",
   );
 
+  if (expectedVisibility === "public") {
+    // Public gallery/content/partner media is intentionally embeddable by the
+    // club frontend, including during local development on another port.
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  }
+
   bucket.openDownloadStream(id)
     .once("error", (error) => {
       console.error("Asset stream error:", error);
