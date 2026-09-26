@@ -65,7 +65,7 @@ app.use(
       return callback(new Error("Origin not allowed by CORS"));
     },
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-File-Name", "X-File-Type"],
   }),
 );
 
