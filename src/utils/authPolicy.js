@@ -20,8 +20,7 @@ export const isBootstrapAdminEmail = (email = "") =>
   getConfiguredBootstrapAdminEmails().has(normalizeEmail(email));
 
 export const requiresVerifiedFirebaseEmail = (user = {}) =>
-  Boolean(user.emailVerificationRequired) &&
-  !isBootstrapAdminEmail(user.email);
+  Boolean(user.emailVerificationRequired);
 
 export const evaluateMemberLogin = ({
   user,
