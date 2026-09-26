@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { getChallengeCollection, getSolveCollection } from "../models/challengeModel.js";
 import { getUserCollection } from "../models/userModel.js";
 import { hashFlag } from "../utils/flag.js";
+import { normalizeAttachments } from "../utils/attachments.js";
 
 const serializeChallenge = (challenge, includeDraftFields = false) => {
   if (!challenge) return null;
@@ -71,6 +72,7 @@ export const createChallenge = async (req, res) => {
       points = 100,
       flag,
       hint = "",
+      attachments = [],
       published = false,
     } = req.body;
 
@@ -92,6 +94,7 @@ export const createChallenge = async (req, res) => {
       points: numericPoints,
       flagHash: hashFlag(flag),
       hint: String(hint || "").trim().slice(0, 1000),
+      attachments: normalizeAttachments(attachments),
       published: Boolean(published),
       archived: false,
       sortOrder: 0,
@@ -124,7 +127,7 @@ export const updateChallenge = async (req, res) => {
       return res.status(404).send({ message: "Challenge not found" });
     }
 
-    const allowed = ["title", "description", "category", "difficulty", "points", "hint", "published", "archived", "sortOrder"];
+    const allowed = ["title", "description", "category", "difficulty", "points", "hint", "attachments", "published", "archived", "sortOrder"];
     const update = { updatedAt: new Date(), updatedBy: req.user.uid };
 
     for (const field of allowed) {
@@ -143,6 +146,9 @@ export const updateChallenge = async (req, res) => {
     if (update.title) update.title = String(update.title).trim().slice(0, 160);
     if (update.description) update.description = String(update.description).trim().slice(0, 6000);
     if (update.hint) update.hint = String(update.hint).trim().slice(0, 1000);
+    if (Object.hasOwn(update, "attachments")) {
+      update.attachments = normalizeAttachments(update.attachments);
+    }
 
     await challenges.updateOne({ _id: existing._id }, { $set: update });
     const changed = await challenges.findOne({ _id: existing._id });
