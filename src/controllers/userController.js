@@ -83,7 +83,7 @@ export const createUser = async (req, res) => {
         const linkedAdmin = await users.findOne({ _id: duplicate._id });
 
         return res.status(200).send({
-          message: "Admin account linked. Verify the official EWUCSC email before login.",
+          message: "Admin account linked. Verify ewucsc@ewubd.edu before login.",
           user: serializeUser(linkedAdmin),
           approvalStatus: "approved",
         });
