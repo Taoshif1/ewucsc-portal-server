@@ -133,6 +133,12 @@ export const createVpResource = async (req, res) => {
       item: serialize({ ...doc, _id: result.insertedId }),
     });
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).send({
+        message: "A VP resource with this URL already exists",
+      });
+    }
+
     console.error("Create VP resource error:", error);
     return res.status(500).send({ message: "Failed to create VP resource" });
   }
@@ -170,6 +176,12 @@ export const updateVpResource = async (req, res) => {
       item: serialize(changed),
     });
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).send({
+        message: "A VP resource with this URL already exists",
+      });
+    }
+
     console.error("Update VP resource error:", error);
     return res.status(500).send({ message: "Failed to update VP resource" });
   }
