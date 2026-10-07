@@ -84,6 +84,15 @@ app.use(
 app.use(helmet());
 app.use(express.json({ limit: "1mb" }));
 
+app.get("/api", (req, res) => {
+  return res.send({
+    ok: true,
+    service: "ewucsc-portal-server",
+    message: "EWUCSC API is running",
+    health: "/api/health",
+  });
+});
+
 app.get("/api/health", async (req, res) => {
   try {
     await connectDB();
