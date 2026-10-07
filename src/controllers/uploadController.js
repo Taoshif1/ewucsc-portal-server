@@ -1,12 +1,33 @@
-import { GridFSBucket, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 import { connectDB } from "../config/db.js";
+import {
+  downloadStorageObject,
+  PRIVATE_BUCKET,
+  PUBLIC_BUCKET,
+  removeStorageObject,
+  uploadStorageObject,
+} from "../config/supabase.js";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const PUBLIC_SCOPES = new Set(["content", "gallery", "partner"]);
 const PRIVATE_SCOPES = new Set(["challenge", "homework"]);
 const ALLOWED_EXTENSIONS = new Set([
-  "jpg", "jpeg", "png", "webp", "gif", "avif",
-  "pdf", "txt", "md", "json", "csv", "zip", "7z", "rar", "pcap", "pcapng",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif",
+  "avif",
+  "pdf",
+  "txt",
+  "md",
+  "json",
+  "csv",
+  "zip",
+  "7z",
+  "rar",
+  "pcap",
+  "pcapng",
 ]);
 
 const safeFileName = (value = "upload") =>
@@ -22,7 +43,11 @@ const fileExtension = (name = "") => {
 };
 
 const isAllowedUpload = (name, mimeType) => {
-  if (mimeType === "text/html" || mimeType === "image/svg+xml" || /javascript/i.test(mimeType)) {
+  if (
+    mimeType === "text/html" ||
+    mimeType === "image/svg+xml" ||
+    /javascript/i.test(mimeType)
+  ) {
     return false;
   }
 
@@ -30,9 +55,9 @@ const isAllowedUpload = (name, mimeType) => {
   return ALLOWED_EXTENSIONS.has(fileExtension(name));
 };
 
-const getBucket = async () => {
+const getAssetCollection = async () => {
   const db = await connectDB();
-  return { db, bucket: new GridFSBucket(db, { bucketName: "media" }) };
+  return db.collection("mediaAssets");
 };
 
 export const uploadAsset = async (req, res) => {
@@ -56,49 +81,66 @@ export const uploadAsset = async (req, res) => {
     try {
       originalName = decodeURIComponent(originalName);
     } catch {
-      // Keep the header value if it was not encoded.
+      // Keep the original header when it was not URI-encoded.
     }
 
     originalName = safeFileName(originalName);
-    const mimeType = String(req.get("x-file-type") || "application/octet-stream")
+    const mimeType = String(
+      req.get("x-file-type") || "application/octet-stream",
+    )
       .trim()
       .slice(0, 120);
 
     if (!isAllowedUpload(originalName, mimeType)) {
       return res.status(400).send({
-        message: "Unsupported file type. Use common images, PDF, text, JSON, CSV, ZIP/7z/RAR or PCAP files.",
+        message:
+          "Unsupported file type. Use common images, PDF, text, JSON, CSV, ZIP/7z/RAR or PCAP files.",
       });
     }
 
     const visibility = isPublic ? "public" : "private";
-    const { bucket } = await getBucket();
+    const bucket = isPublic ? PUBLIC_BUCKET : PRIVATE_BUCKET;
+    const id = new ObjectId();
+    const idString = id.toHexString();
+    const objectPath = `${scope}/${idString}/${originalName}`;
 
-    const upload = bucket.openUploadStream(originalName, {
+    await uploadStorageObject({
+      bucket,
+      path: objectPath,
+      buffer: req.body,
       contentType: mimeType,
-      metadata: {
-        originalName,
-        mimeType,
-        scope,
-        visibility,
-        uploadedBy: req.user.uid,
-        createdAt: new Date(),
-      },
     });
 
-    await new Promise((resolve, reject) => {
-      upload.once("error", reject);
-      upload.once("finish", resolve);
-      upload.end(req.body);
-    });
+    const now = new Date();
+    const assetDoc = {
+      _id: id,
+      originalName,
+      mimeType,
+      size: req.body.length,
+      scope,
+      visibility,
+      bucket,
+      objectPath,
+      uploadedBy: req.user.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
 
-    const id = upload.id.toString();
-    const apiPath = `/uploads/${visibility}/${id}`;
-    const publicUrl = isPublic ? `/api/uploads/public/${id}` : null;
+    try {
+      const assets = await getAssetCollection();
+      await assets.insertOne(assetDoc);
+    } catch (error) {
+      await removeStorageObject({ bucket, path: objectPath }).catch(() => {});
+      throw error;
+    }
+
+    const apiPath = `/uploads/${visibility}/${idString}`;
+    const publicUrl = isPublic ? `/api/uploads/public/${idString}` : null;
 
     return res.status(201).send({
       message: "Upload complete",
       asset: {
-        id,
+        id: idString,
         name: originalName,
         mimeType,
         size: req.body.length,
@@ -119,37 +161,40 @@ const streamAsset = async (req, res, expectedVisibility) => {
     return res.status(400).send({ message: "Invalid asset ID" });
   }
 
-  const { db, bucket } = await getBucket();
-  const id = new ObjectId(req.params.id);
-  const file = await db.collection("media.files").findOne({ _id: id });
+  const assets = await getAssetCollection();
+  const file = await assets.findOne({ _id: new ObjectId(req.params.id) });
 
-  if (!file || file.metadata?.visibility !== expectedVisibility) {
+  if (!file || file.visibility !== expectedVisibility) {
     return res.status(404).send({ message: "Asset not found" });
   }
 
-  res.setHeader("Content-Type", file.contentType || file.metadata?.mimeType || "application/octet-stream");
+  const downloaded = await downloadStorageObject({
+    bucket: file.bucket,
+    path: file.objectPath,
+  });
+
+  res.setHeader(
+    "Content-Type",
+    file.mimeType || downloaded.contentType || "application/octet-stream",
+  );
   res.setHeader(
     "Content-Disposition",
-    `inline; filename*=UTF-8''${encodeURIComponent(file.metadata?.originalName || file.filename || "asset")}`,
+    `inline; filename*=UTF-8''${encodeURIComponent(
+      file.originalName || "asset",
+    )}`,
   );
   res.setHeader(
     "Cache-Control",
-    expectedVisibility === "public" ? "public, max-age=86400" : "private, no-store",
+    expectedVisibility === "public"
+      ? "public, max-age=86400"
+      : "private, no-store",
   );
 
   if (expectedVisibility === "public") {
-    // Public gallery/content/partner media is intentionally embeddable by the
-    // club frontend, including during local development on another port.
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   }
 
-  bucket.openDownloadStream(id)
-    .once("error", (error) => {
-      console.error("Asset stream error:", error);
-      if (!res.headersSent) res.status(404).end();
-      else res.destroy(error);
-    })
-    .pipe(res);
+  return res.send(downloaded.buffer);
 };
 
 export const getPublicAsset = async (req, res) => {
@@ -176,13 +221,19 @@ export const deleteAsset = async (req, res) => {
       return res.status(400).send({ message: "Invalid asset ID" });
     }
 
-    const { db, bucket } = await getBucket();
+    const assets = await getAssetCollection();
     const id = new ObjectId(req.params.id);
-    const file = await db.collection("media.files").findOne({ _id: id });
+    const file = await assets.findOne({ _id: id });
 
     if (!file) return res.status(404).send({ message: "Asset not found" });
 
-    await bucket.delete(id);
+    await removeStorageObject({
+      bucket: file.bucket,
+      path: file.objectPath,
+    });
+
+    await assets.deleteOne({ _id: id });
+
     return res.send({ message: "Asset deleted" });
   } catch (error) {
     console.error("Delete asset error:", error);
