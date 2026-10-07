@@ -463,7 +463,7 @@ class SupabaseCollection {
     );
 
     try {
-      await supabaseRest("/rest/v1/documents?on_conflict=id", {
+      await supabaseRest("/rest/v1/documents?on_conflict=collection,id", {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
         body: [{ id, collection: this.name, data }],
