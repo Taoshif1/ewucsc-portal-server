@@ -202,7 +202,7 @@ export const removeStorageObject = async ({ bucket, path }) => {
 };
 
 export const upsertDocument = async ({ id, collection, data }) => {
-  return supabaseRest("/rest/v1/documents?on_conflict=id", {
+  return supabaseRest("/rest/v1/documents?on_conflict=collection,id", {
     method: "POST",
     headers: {
       Prefer: "resolution=merge-duplicates,return=minimal",
