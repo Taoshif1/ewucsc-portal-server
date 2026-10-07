@@ -182,20 +182,21 @@ Current tests cover EWU Student-ID/email normalization and flag hashing behavior
 
 ## Production hosting
 
-The API is designed for a normal Node host such as Render or Railway.
+The API is designed for a normal Node host such as cPanel/Passenger, Render or Railway.
 
 Recommended final URL:
 
 ```text
-https://api.ewucsc.org
+https://api.ewucsc.com
 ```
 
 Allowed browser origins should include only deployed EWUCSC client domains, for example:
 
 ```text
-https://ewucsc.org
-https://portal.ewucsc.org
-https://resources.ewucsc.org
+https://ewucsc.com
+https://www.ewucsc.com
+https://portal.ewucsc.com
+https://resources.ewucsc.com
 ```
 
 Do not merge/deploy a frontend that expects these new APIs until the corresponding server release is reachable.
