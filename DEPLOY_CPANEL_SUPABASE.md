@@ -12,14 +12,14 @@ The API talks to Supabase over HTTPS/443, so it does not depend on MongoDB TCP/2
 
 ## Supabase
 
-Create a dedicated EWUCSC project and apply `supabase/schema.sql`.
+The dedicated EWUCSC Supabase project has been created in `Taoshif1's Org` (project ref `xpynuvsdbfdtanjlnizl`, Mumbai region) and `supabase/schema.sql` has been applied.
 
 Use a server-side Secret key only in the Node app:
 
 ```env
 NODE_ENV=production
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_SECRET_KEY=sb_secret_...
+SUPABASE_URL=https://xpynuvsdbfdtanjlnizl.supabase.co
+SUPABASE_SECRET_KEY=PASTE_THE_SERVER_ONLY_SECRET_KEY_DIRECTLY_IN_CPANEL
 SUPABASE_PUBLIC_BUCKET=ewucsc-public
 SUPABASE_PRIVATE_BUCKET=ewucsc-private
 
