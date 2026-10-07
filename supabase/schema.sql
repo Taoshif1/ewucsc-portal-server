@@ -2,11 +2,12 @@
 -- Run this once in the Supabase SQL Editor or apply it as a migration.
 
 create table if not exists public.documents (
-  id text primary key,
+  id text not null,
   collection text not null check (length(collection) between 1 and 80),
   data jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (collection, id)
 );
 
 create index if not exists documents_collection_idx
