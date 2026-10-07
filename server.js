@@ -16,7 +16,10 @@ import formRoutes from "./src/routes/formRoutes.js";
 import siteSettingsRoutes from "./src/routes/siteSettingsRoutes.js";
 import partnerRoutes from "./src/routes/partnerRoutes.js";
 import vpResourceRoutes from "./src/routes/vpResourceRoutes.js";
-import { bootstrapAdminsReady, ensureBootstrapAdminSeeds } from "./src/services/bootstrapAdmins.js";
+import {
+  bootstrapAdminsReady,
+  ensureBootstrapAdminSeeds,
+} from "./src/services/bootstrapAdmins.js";
 
 dotenv.config();
 
@@ -69,7 +72,12 @@ app.use(
       return callback(new Error("Origin not allowed by CORS"));
     },
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-File-Name", "X-File-Type"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-File-Name",
+      "X-File-Type",
+    ],
   }),
 );
 
@@ -85,11 +93,17 @@ app.get("/api/health", async (req, res) => {
     return res.send({
       ok: true,
       service: "ewucsc-portal-server",
+      database: "supabase",
       adminBootstrapReady,
       timestamp: new Date().toISOString(),
     });
-  } catch {
-    return res.status(503).send({ ok: false, service: "ewucsc-portal-server" });
+  } catch (error) {
+    console.error("Health check failed:", error);
+    return res.status(503).send({
+      ok: false,
+      service: "ewucsc-portal-server",
+      database: "supabase",
+    });
   }
 });
 
@@ -125,11 +139,15 @@ const PORT = Number(process.env.PORT || 5000);
 let server;
 
 const start = async () => {
-  await connectDB();
-
   server = app.listen(PORT, () => {
     console.log(`EWUCSC server listening on port ${PORT}`);
   });
+
+  connectDB()
+    .then(() => ensureBootstrapAdminSeeds())
+    .catch((error) => {
+      console.error("EWUCSC database warm-up failed:", error);
+    });
 };
 
 const shutdown = (signal) => {
