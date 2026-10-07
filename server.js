@@ -26,9 +26,10 @@ const defaultBrowserOrigins = [
   "https://ewucsc-portal-client.vercel.app",
   "https://ewucsc-portal-client-taoshifs-projects.vercel.app",
   "https://ewucsc-portal-client-git-main-taoshifs-projects.vercel.app",
-  "https://ewucsc.org",
-  "https://portal.ewucsc.org",
-  "https://resources.ewucsc.org",
+  "https://ewucsc.com",
+  "https://www.ewucsc.com",
+  "https://portal.ewucsc.com",
+  "https://resources.ewucsc.com",
 ];
 
 const configuredOrigins = [
