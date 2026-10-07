@@ -6,6 +6,7 @@ import {
   ensureStorageBuckets,
   uploadStorageObject,
   upsertDocument,
+  supabaseRest,
 } from "../src/config/supabase.js";
 
 dotenv.config();
@@ -62,6 +63,55 @@ const collectStream = async (stream) => {
   }
 
   return Buffer.concat(chunks);
+};
+
+const normalizeEmail = (value = "") =>
+  String(value || "").trim().toLowerCase();
+
+const cleanBootstrapPlaceholders = async (sourceUsers) => {
+  const targetRows = await supabaseRest(
+    "/rest/v1/documents?select=id,data&collection=eq.ewucscusers&limit=1000",
+  );
+
+  const sourceEmails = new Set(
+    sourceUsers.map((row) => normalizeEmail(row.email)).filter(Boolean),
+  );
+  const sourceStudentIds = new Set(
+    sourceUsers
+      .map((row) => String(row.studentId || "").trim())
+      .filter(Boolean),
+  );
+
+  const placeholders = (Array.isArray(targetRows) ? targetRows : []).filter(
+    (row) => {
+      const data = row.data || {};
+      const email = normalizeEmail(data.email);
+      const studentId = String(data.studentId || "").trim();
+
+      const isGeneratedBootstrapPlaceholder =
+        data.approvedBy === "bootstrap-config" &&
+        !data.uid;
+
+      const matchesSourceIdentity =
+        (email && sourceEmails.has(email)) ||
+        (studentId && sourceStudentIds.has(studentId));
+
+      return isGeneratedBootstrapPlaceholder && matchesSourceIdentity;
+    },
+  );
+
+  for (const row of placeholders) {
+    await supabaseRest(
+      `/rest/v1/documents?collection=eq.ewucscusers&id=eq.${encodeURIComponent(
+        row.id,
+      )}`,
+      { method: "DELETE" },
+    );
+
+    console.log(
+      `ewucscusers: removed generated bootstrap placeholder ${row.id} before migration`,
+    );
+  }
 };
 
 const migrateCollection = async (db, name) => {
@@ -162,6 +212,10 @@ const main = async () => {
     const db = client.db("ewucsc");
 
     console.log("Migrating collections...");
+
+    const sourceUsers = await db.collection("ewucscusers").find({}).toArray();
+    await cleanBootstrapPlaceholders(sourceUsers);
+
     for (const name of COLLECTIONS) {
       await migrateCollection(db, name);
     }
